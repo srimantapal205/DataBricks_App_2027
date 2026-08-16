@@ -161,52 +161,8 @@ st.dataframe(
 
 
 # ---------------------------------------------------------
-# Create
-# ---------------------------------------------------------
-
-st.sidebar.header("➕ Add Customer")
-
-with st.sidebar.form("customer_form"):
-
-    customer_name = st.text_input(
-        "Customer Name"
-    )
-
-    email = st.text_input(
-        "Email"
-    )
-
-    country = st.selectbox(
-        "Country",
-        [
-            "India",
-            "USA",
-            "UK",
-            "Singapore",
-            "Canada",
-            "Australia"
-        ]
-    )
-
-    segment = st.selectbox(
-        "Segment",
-        [
-            "Enterprise",
-            "SMB",
-            "Retail"
-        ]
-    )
-
-    annual_revenue = st.number_input(
-        "Annual Revenue",
-        min_value=0.0,
-        step=1000.0
-    )
-
-    submitted = st.form_submit_button(
-        "Add Customer"
-    )
-
+# Add database INSERT
+#---------------------------------------------------------
 
 def add_customer(
     customer_name,
@@ -261,3 +217,50 @@ def add_customer(
     finally:
 
         conn.close()
+
+# ---------------------------------------------------------
+# Add Customer form
+# ---------------------------------------------------------
+
+st.sidebar.header("➕ Add Customer")
+
+with st.sidebar.form("customer_form"):
+
+    customer_name = st.text_input(
+        "Customer Name"
+    )
+
+    email = st.text_input(
+        "Email"
+    )
+
+    country = st.selectbox(
+        "Country",
+        [
+            "India",
+            "USA",
+            "UK",
+            "Singapore",
+            "Canada",
+            "Australia"
+        ]
+    )
+
+    segment = st.selectbox(
+        "Segment",
+        [
+            "Enterprise",
+            "SMB",
+            "Retail"
+        ]
+    )
+
+    annual_revenue = st.number_input(
+        "Annual Revenue",
+        min_value=0.0,
+        step=1000.0
+    )
+
+    submitted = st.form_submit_button(
+        "Add Customer"
+    )

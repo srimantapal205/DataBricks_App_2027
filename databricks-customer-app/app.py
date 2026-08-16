@@ -162,7 +162,7 @@ st.dataframe(
 
 # ---------------------------------------------------------
 # Add database INSERT
-#---------------------------------------------------------
+# ---------------------------------------------------------
 
 def add_customer(
     customer_name,
@@ -177,32 +177,29 @@ def add_customer(
     try:
 
         query = """
-        INSERT INTO demo_catalog.customer_app.customers
-        (
-            MAX(customer_id) + 1,
-            customer_name,
-            email,
-            country,
-            segment,
-            annual_revenue,
-            created_date,
-            updated_date
-        )
-        VALUES
-        (
-            NULL,
-            ?,
-            ?,
-            ?,
-            ?,
-            ?,
-            current_date(),
-            current_timestamp()
-        )
+            INSERT INTO demo_catalog.customer_app.customers
+            (
+                customer_name,
+                email,
+                country,
+                segment,
+                annual_revenue,
+                created_date,
+                updated_date
+            )
+            VALUES
+            (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                current_date(),
+                current_timestamp()
+            )
         """
 
         with conn.cursor() as cursor:
-
             cursor.execute(
                 query,
                 (
@@ -210,13 +207,15 @@ def add_customer(
                     email,
                     country,
                     segment,
-                    annual_revenue
+                    float(annual_revenue)
                 )
             )
 
-    finally:
+        conn.commit()
 
+    finally:
         conn.close()
+
 
 # ---------------------------------------------------------
 # Add Customer form
@@ -264,3 +263,17 @@ with st.sidebar.form("customer_form"):
     submitted = st.form_submit_button(
         "Add Customer"
     )
+
+    if submitted:
+        if not customer_name or not email:
+            st.sidebar.error("Customer name and email are required.")
+        else:
+            add_customer(
+                customer_name,
+                email,
+                country,
+                segment,
+                annual_revenue
+            )
+            st.sidebar.success("Customer added successfully.")
+            st.rerun()

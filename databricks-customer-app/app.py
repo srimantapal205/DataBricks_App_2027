@@ -164,6 +164,25 @@ st.dataframe(
 # Add database INSERT
 # ---------------------------------------------------------
 
+def get_next_customer_id():
+
+    conn = get_connection()
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                    SELECT COALESCE(MAX(customer_id), 0) + 1 AS next_customer_id
+                    FROM demo_catalog.customer_app.customers
+                """
+            )
+            result = cursor.fetchone()
+            return int(result[0]) if result and result[0] is not None else 1
+
+    finally:
+        conn.close()
+
+
 def add_customer(
     customer_name,
     email,
@@ -172,6 +191,8 @@ def add_customer(
     annual_revenue
 ):
 
+    customer_id = get_next_customer_id()
+
     conn = get_connection()
 
     try:
@@ -179,6 +200,7 @@ def add_customer(
         query = """
             INSERT INTO demo_catalog.customer_app.customers
             (
+                customer_id,
                 customer_name,
                 email,
                 country,
@@ -194,6 +216,7 @@ def add_customer(
                 ?,
                 ?,
                 ?,
+                ?,
                 current_date(),
                 current_timestamp()
             )
@@ -203,6 +226,7 @@ def add_customer(
             cursor.execute(
                 query,
                 (
+                    customer_id,
                     customer_name,
                     email,
                     country,
@@ -268,12 +292,14 @@ with st.sidebar.form("customer_form"):
         if not customer_name or not email:
             st.sidebar.error("Customer name and email are required.")
         else:
-            add_customer(
-                customer_name,
-                email,
-                country,
-                segment,
-                annual_revenue
-            )
+            with st.spinner("Adding customer and refreshing data..."):
+                add_customer(
+                    customer_name,
+                    email,
+                    country,
+                    segment,
+                    annual_revenue
+                )
+
             st.sidebar.success("Customer added successfully.")
             st.rerun()

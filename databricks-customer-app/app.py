@@ -1,0 +1,160 @@
+import os
+
+import pandas as pd
+import streamlit as st
+
+from databricks import sql
+from databricks.sdk.core import Config
+
+
+# ---------------------------------------------------------
+# Application configuration
+# ---------------------------------------------------------
+
+st.set_page_config(
+    page_title="Customer Management",
+    page_icon="👥",
+    layout="wide"
+)
+
+st.title("👥 Customer Management App")
+st.caption("Azure Databricks + Streamlit + Unity Catalog")
+
+
+# ---------------------------------------------------------
+# Databricks configuration
+# ---------------------------------------------------------
+
+cfg = Config()
+
+
+def get_connection():
+
+    warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+
+    if not warehouse_id:
+        st.error("DATABRICKS_WAREHOUSE_ID is not configured.")
+        st.stop()
+
+    http_path = f"/sql/1.0/warehouses/{warehouse_id}"
+
+    server_hostname = cfg.host
+
+    if server_hostname.startswith("https://"):
+        server_hostname = server_hostname.replace("https://", "")
+
+    return sql.connect(
+        server_hostname=server_hostname,
+        http_path=http_path,
+        credentials_provider=lambda: cfg.authenticate,
+        _use_arrow_native_complex_types=False
+    )
+
+
+# ---------------------------------------------------------
+# Read customer data
+# ---------------------------------------------------------
+
+def get_customers():
+
+    query = """
+        SELECT
+            customer_id,
+            customer_name,
+            email,
+            country,
+            segment,
+            annual_revenue,
+            created_date,
+            updated_date
+        FROM demo_catalog.customer_app.customers
+        ORDER BY customer_id
+    """
+
+    conn = get_connection()
+
+    try:
+
+        with conn.cursor() as cursor:
+
+            cursor.execute(query)
+
+            return cursor.fetchall_arrow().to_pandas()
+
+    finally:
+
+        conn.close()
+
+
+# ---------------------------------------------------------
+# Load data
+# ---------------------------------------------------------
+
+df = get_customers()
+
+
+# ---------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.metric(
+        "Total Customers",
+        len(df)
+    )
+
+with col2:
+    st.metric(
+        "Countries",
+        df["country"].nunique()
+    )
+
+with col3:
+    st.metric(
+        "Total Revenue",
+        f"${df['annual_revenue'].sum():,.0f}"
+    )
+
+
+st.divider()
+
+
+# ---------------------------------------------------------
+# Search
+# ---------------------------------------------------------
+
+search = st.text_input(
+    "🔎 Search Customer",
+    placeholder="Enter customer name..."
+)
+
+
+if search:
+
+    filtered_df = df[
+        df["customer_name"]
+        .str.contains(
+            search,
+            case=False,
+            na=False
+        )
+    ]
+
+else:
+
+    filtered_df = df
+
+
+# ---------------------------------------------------------
+# Display
+# ---------------------------------------------------------
+
+st.subheader("Customer Data")
+
+st.dataframe(
+    filtered_df,
+    use_container_width=True,
+    hide_index=True
+)

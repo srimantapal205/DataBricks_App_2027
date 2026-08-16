@@ -2,3 +2,10 @@ command:
   - streamlit
   - run
   - app.py
+
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "9ddd8e60ba810fdd"
+
+  - name: STREAMLIT_GATHER_USAGE_STATS
+    value: "false"

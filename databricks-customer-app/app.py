@@ -158,3 +158,106 @@ st.dataframe(
     use_container_width=True,
     hide_index=True
 )
+
+
+# ---------------------------------------------------------
+# Create
+# ---------------------------------------------------------
+
+st.sidebar.header("➕ Add Customer")
+
+with st.sidebar.form("customer_form"):
+
+    customer_name = st.text_input(
+        "Customer Name"
+    )
+
+    email = st.text_input(
+        "Email"
+    )
+
+    country = st.selectbox(
+        "Country",
+        [
+            "India",
+            "USA",
+            "UK",
+            "Singapore",
+            "Canada",
+            "Australia"
+        ]
+    )
+
+    segment = st.selectbox(
+        "Segment",
+        [
+            "Enterprise",
+            "SMB",
+            "Retail"
+        ]
+    )
+
+    annual_revenue = st.number_input(
+        "Annual Revenue",
+        min_value=0.0,
+        step=1000.0
+    )
+
+    submitted = st.form_submit_button(
+        "Add Customer"
+    )
+
+
+def add_customer(
+    customer_name,
+    email,
+    country,
+    segment,
+    annual_revenue
+):
+
+    conn = get_connection()
+
+    try:
+
+        query = """
+        INSERT INTO demo_catalog.customer_app.customers
+        (
+            MAX(customer_id) + 1,
+            customer_name,
+            email,
+            country,
+            segment,
+            annual_revenue,
+            created_date,
+            updated_date
+        )
+        VALUES
+        (
+            NULL,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            current_date(),
+            current_timestamp()
+        )
+        """
+
+        with conn.cursor() as cursor:
+
+            cursor.execute(
+                query,
+                (
+                    customer_name,
+                    email,
+                    country,
+                    segment,
+                    annual_revenue
+                )
+            )
+
+    finally:
+
+        conn.close()

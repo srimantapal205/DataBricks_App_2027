@@ -1,10 +1,28 @@
 import os
+import logging
 
 import pandas as pd
 import streamlit as st
 
 from databricks import sql
-from databricks.sdk.core import Config
+from databricks.sdk.core import Config as DatabricksConfig
+
+from config import load_environment, validate_config, get_database_path
+
+
+# ---------------------------------------------------------
+# Load Environment Configuration
+# ---------------------------------------------------------
+
+try:
+    app_config = load_environment()
+    validate_config()
+except Exception as e:
+    st.error(f"Configuration Error: {str(e)}")
+    st.info("Please check your .env file and try again.")
+    st.stop()
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------
@@ -17,38 +35,61 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("👥 Customer Management App")
-st.caption("Azure Databricks + Streamlit + Unity Catalog")
+st.title(app_config.APP_TITLE)
+st.caption(app_config.APP_DESCRIPTION)
+
+if app_config.DEBUG_MODE:
+    with st.expander("🔧 Debug Info"):
+        st.write(f"**Environment:** {app_config.APP_ENV}")
+        st.write(f"**Database:** {get_database_path()}")
+        st.write(f"**Debug Mode:** {app_config.DEBUG_MODE}")
 
 
 # ---------------------------------------------------------
 # Databricks configuration
 # ---------------------------------------------------------
 
-cfg = Config()
+bricks_config = DatabricksConfig(
+    host=app_config.DATABRICKS_HOST,
+    token=app_config.DATABRICKS_TOKEN
+)
 
 
 def get_connection():
-
-    warehouse_id = os.getenv("DATABRICKS_WAREHOUSE_ID")
+    """
+    Create and return a connection to Databricks SQL warehouse.
+    
+    Returns:
+        sql.Connection: Connection to Databricks SQL warehouse
+        
+    Raises:
+        Exception: If warehouse ID is not configured
+    """
+    warehouse_id = app_config.DATABRICKS_WAREHOUSE_ID
 
     if not warehouse_id:
         st.error("DATABRICKS_WAREHOUSE_ID is not configured.")
         st.stop()
 
     http_path = f"/sql/1.0/warehouses/{warehouse_id}"
-
-    server_hostname = cfg.host
+    server_hostname = bricks_config.host
 
     if server_hostname.startswith("https://"):
         server_hostname = server_hostname.replace("https://", "")
 
-    return sql.connect(
-        server_hostname=server_hostname,
-        http_path=http_path,
-        credentials_provider=lambda: cfg.authenticate,
-        _use_arrow_native_complex_types=False
-    )
+    try:
+        conn = sql.connect(
+            server_hostname=server_hostname,
+            http_path=http_path,
+            credentials_provider=lambda: bricks_config.authenticate,
+            _use_arrow_native_complex_types=False
+        )
+        logger.debug(f"Connected to Databricks warehouse: {warehouse_id}")
+        return conn
+    except Exception as e:
+        logger.error(f"Failed to connect to Databricks: {str(e)}")
+        st.error(f"Database connection failed: {str(e)}")
+        st.stop()
 
 
 # ---------------------------------------------------------
@@ -56,8 +97,14 @@ def get_connection():
 # ---------------------------------------------------------
 
 def get_customers():
-
-    query = """
+    """
+    Fetch all customers from the configured database table.
+    
+    Returns:
+        DataFrame: Customer data from the database
+    """
+    db_path = get_database_path()
+    query = f"""
         SELECT
             customer_id,
             customer_name,
@@ -67,22 +114,23 @@ def get_customers():
             annual_revenue,
             created_date,
             updated_date
-        FROM demo_catalog.customer_app.customers
+        FROM {db_path}
         ORDER BY customer_id
     """
 
     conn = get_connection()
 
     try:
-
         with conn.cursor() as cursor:
-
             cursor.execute(query)
-
-            return cursor.fetchall_arrow().to_pandas()
-
+            result = cursor.fetchall_arrow().to_pandas()
+            logger.debug(f"Fetched {len(result)} customers")
+            return result
+    except Exception as e:
+        logger.error(f"Error fetching customers: {str(e)}")
+        st.error(f"Failed to fetch customers: {str(e)}")
+        st.stop()
     finally:
-
         conn.close()
 
 
@@ -165,20 +213,31 @@ st.dataframe(
 # ---------------------------------------------------------
 
 def get_next_customer_id():
-
+    """
+    Generate the next customer ID.
+    
+    Returns:
+        int: Next available customer ID
+    """
+    db_path = get_database_path()
     conn = get_connection()
 
     try:
         with conn.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                     SELECT COALESCE(MAX(customer_id), 0) + 1 AS next_customer_id
-                    FROM demo_catalog.customer_app.customers
+                    FROM {db_path}
                 """
             )
             result = cursor.fetchone()
-            return int(result[0]) if result and result[0] is not None else 1
-
+            next_id = int(result[0]) if result and result[0] is not None else 1
+            logger.debug(f"Next customer ID: {next_id}")
+            return next_id
+    except Exception as e:
+        logger.error(f"Error getting next customer ID: {str(e)}")
+        st.error(f"Failed to generate customer ID: {str(e)}")
+        st.stop()
     finally:
         conn.close()
 
@@ -190,15 +249,23 @@ def add_customer(
     segment,
     annual_revenue
 ):
-
+    """
+    Add a new customer to the database.
+    
+    Args:
+        customer_name: Customer name
+        email: Customer email
+        country: Customer country
+        segment: Customer segment
+        annual_revenue: Annual revenue
+    """
     customer_id = get_next_customer_id()
-
+    db_path = get_database_path()
     conn = get_connection()
 
     try:
-
-        query = """
-            INSERT INTO demo_catalog.customer_app.customers
+        query = f"""
+            INSERT INTO {db_path}
             (
                 customer_id,
                 customer_name,
@@ -236,7 +303,11 @@ def add_customer(
             )
 
         conn.commit()
+        logger.info(f"Customer added: {customer_name} (ID: {customer_id})")
 
+    except Exception as e:
+        logger.error(f"Error adding customer: {str(e)}")
+        st.error(f"Failed to add customer: {str(e)}")
     finally:
         conn.close()
 

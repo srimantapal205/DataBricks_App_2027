@@ -122,8 +122,8 @@ Add the following variables:
 - DATABRICKS_TOKEN = dapi...
 - DATABRICKS_WAREHOUSE_ID = 9ddd8e60ba810fdd
 - CATALOG_NAME = demo_catalog
-- SCHEMA_NAME = customer_app
-- TABLE_NAME = customers
+- optional SCHEMA_NAME = customer_app
+- optional TABLE_NAME = customers
 - APP_TITLE = Customer Management App
 - APP_DESCRIPTION = Azure Databricks + Streamlit + Unity Catalog
 - DEBUG_MODE = true

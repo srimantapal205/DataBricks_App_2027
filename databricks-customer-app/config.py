@@ -16,8 +16,6 @@ REQUIRED_FIELDS = [
     "DATABRICKS_TOKEN",
     "DATABRICKS_WAREHOUSE_ID",
     "CATALOG_NAME",
-    "SCHEMA_NAME",
-    "TABLE_NAME",
 ]
 
 
@@ -41,30 +39,17 @@ class Config:
     """Base configuration class with defaults"""
     
     def __init__(self):
-        """Initialize        variables:
-        - group: databricks-customer-app
-        
-        steps:
-        - script: python app.py
-          env:
-            APP_ENV: $(APP_ENV)
-            DATABRICKS_HOST: $(DATABRICKS_HOST)
-            DATABRICKS_TOKEN: $(DATABRICKS_TOKEN)
-            DATABRICKS_WAREHOUSE_ID: $(DATABRICKS_WAREHOUSE_ID)
-            CATALOG_NAME: $(CATALOG_NAME)
-            SCHEMA_NAME: $(SCHEMA_NAME)
-            TABLE_NAME: $(TABLE_NAME)
-            DEBUG_MODE: $(DEBUG_MODE)
-            LOG_LEVEL: $(LOG_LEVEL)"""
+        """Initialize configuration by reading environment variables."""
         # Databricks Configuration
         self.DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
         self.DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
         self.DATABRICKS_WAREHOUSE_ID = os.getenv("DATABRICKS_WAREHOUSE_ID", "")
         
-        # Catalog & Schema Configuration
-        self.CATALOG_NAME = os.getenv("CATALOG_NAME", "demo_catalog")
-        self.SCHEMA_NAME = os.getenv("SCHEMA_NAME", "customer_app")
-        self.TABLE_NAME = os.getenv("TABLE_NAME", "customers")
+        # Catalog configuration (required)
+        # Schema/table default to a common development pattern and can be overridden.
+        self.CATALOG_NAME = os.getenv("CATALOG_NAME", "").strip()
+        self.SCHEMA_NAME = os.getenv("SCHEMA_NAME", "customer_app").strip() or "customer_app"
+        self.TABLE_NAME = os.getenv("TABLE_NAME", "customers").strip() or "customers"
         
         # Streamlit Configuration
         self.STREAMLIT_GATHER_USAGE_STATS = os.getenv("STREAMLIT_GATHER_USAGE_STATS", "false").lower() == "true"
@@ -130,13 +115,17 @@ def load_environment(env_name: str = None) -> Config:
 
 def get_database_path() -> str:
     """
-    Get the full database path in format: catalog.schema.table
-    
-    Returns:
-        str: Full database path
+    Get the full database path in format: catalog.schema.table.
+
+    Schema and table are optional overrides; if omitted, sensible defaults are used
+    so a valid Unity Catalog table name is still resolved.
     """
     config = Config()
-    return f"{config.CATALOG_NAME}.{config.SCHEMA_NAME}.{config.TABLE_NAME}"
+    catalog = config.CATALOG_NAME.strip()
+    schema = config.SCHEMA_NAME.strip() or "customer_app"
+    table = config.TABLE_NAME.strip() or "customers"
+
+    return f"{catalog}.{schema}.{table}"
 
 
 def validate_config() -> bool:
@@ -156,8 +145,6 @@ def validate_config() -> bool:
         "DATABRICKS_TOKEN": config.DATABRICKS_TOKEN,
         "DATABRICKS_WAREHOUSE_ID": config.DATABRICKS_WAREHOUSE_ID,
         "CATALOG_NAME": config.CATALOG_NAME,
-        "SCHEMA_NAME": config.SCHEMA_NAME,
-        "TABLE_NAME": config.TABLE_NAME,
     }
     
     missing_fields = [field for field, value in required_fields.items() if not value]

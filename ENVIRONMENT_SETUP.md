@@ -56,10 +56,13 @@ DATABRICKS_TOKEN=dapi...
 DATABRICKS_WAREHOUSE_ID=9ddd8e60ba810fdd
 ```
 
-### Catalog & Schema Configuration
+### Catalog Configuration
 
 ```env
+# Required
 CATALOG_NAME=demo_catalog
+
+# Optional for environment-specific table selection
 SCHEMA_NAME=customer_app
 TABLE_NAME=customers
 ```

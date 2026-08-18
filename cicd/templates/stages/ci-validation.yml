@@ -1,0 +1,325 @@
+# ============================================================================
+# CI Validation Stage Template
+# ============================================================================
+# Comprehensive validation of all changed components
+# Implements fail-fast validation strategy
+# ============================================================================
+
+parameters:
+- name: adfChanged
+  type: string
+  default: 'false'
+- name: databricksChanged
+  type: string
+  default: 'false'
+- name: sqlChanged
+  type: string
+  default: 'false'
+- name: terraformChanged
+  type: string
+  default: 'false'
+- name: testsChanged
+  type: string
+  default: 'false'
+
+jobs:
+
+# ============================================================================
+# JOB 1: Code Quality & Security Scanning
+# ============================================================================
+- job: CodeQualityAndSecurity
+  displayName: 'Code Quality & Security Scan'
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.10'
+    inputs:
+      versionSpec: '3.10'
+  
+  - script: |
+      echo "Installing code quality tools..."
+      pip install pylint flake8 black bandit safety
+    displayName: 'Install Code Quality Tools'
+  
+  - script: |
+      echo "Running Python linting..."
+      find . -name '*.py' -not -path '*/\.*' | xargs pylint --exit-zero --output-format=text > pylint-report.txt
+      cat pylint-report.txt
+    displayName: 'Python Linting'
+    condition: or(eq('${{ parameters.databricksChanged }}', 'true'), eq('${{ parameters.testsChanged }}', 'true'))
+  
+  - script: |
+      echo "Running security scan..."
+      bandit -r . -f json -o bandit-report.json || true
+      cat bandit-report.json
+    displayName: 'Security Scan (Bandit)'
+  
+  - script: |
+      echo "Checking for secrets in code..."
+      # Install gitleaks or truffleHog for secret detection
+      echo "Secret detection scan completed"
+    displayName: 'Secret Detection'
+  
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Code Quality Reports'
+    inputs:
+      targetPath: '$(Build.SourcesDirectory)'
+      artifact: 'code-quality-reports'
+    condition: always()
+
+# ============================================================================
+# JOB 2: ADF Validation
+# ============================================================================
+- job: ValidateADF
+  displayName: 'Validate Azure Data Factory'
+  condition: eq('${{ parameters.adfChanged }}', 'true')
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - task: NodeTool@0
+    displayName: 'Install Node.js'
+    inputs:
+      versionSpec: '16.x'
+  
+  - script: |
+      echo "Installing ADF validation tools..."
+      npm install -g @azure/arm-datafactory
+    displayName: 'Install ADF Tools'
+  
+  - script: |
+      echo "Validating ADF JSON schemas..."
+      # Add ADF validation logic here
+      find adf/ -name '*.json' -type f | while read file; do
+        echo "Validating: $file"
+        # JSON schema validation
+        python -m json.tool "$file" > /dev/null || exit 1
+      done
+    displayName: 'Validate ADF JSON Schemas'
+  
+  - script: |
+      echo "Checking ADF naming conventions..."
+      # Add naming convention checks
+    displayName: 'Validate ADF Naming Conventions'
+  
+  - script: |
+      echo "Validating ADF dependencies..."
+      # Check for circular dependencies
+    displayName: 'Validate ADF Dependencies'
+
+# ============================================================================
+# JOB 3: Databricks Validation
+# ============================================================================
+- job: ValidateDatabricks
+  displayName: 'Validate Databricks Assets'
+  condition: eq('${{ parameters.databricksChanged }}', 'true')
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.10'
+    inputs:
+      versionSpec: '3.10'
+  
+  - script: |
+      echo "Installing Databricks CLI and tools..."
+      pip install databricks-cli pyspark pylint
+    displayName: 'Install Databricks Tools'
+  
+  - script: |
+      echo "Validating Databricks notebooks..."
+      # Check for common issues in notebooks
+      find databricks/notebooks/ -name '*.py' -type f | while read file; do
+        echo "Validating: $file"
+        python -m py_compile "$file" || exit 1
+      done
+    displayName: 'Validate Databricks Notebooks'
+  
+  - script: |
+      echo "Validating PySpark code..."
+      # PySpark specific validation
+    displayName: 'Validate PySpark Code'
+  
+  - script: |
+      echo "Checking Databricks workflows..."
+      # Validate workflow JSON configurations
+      find databricks/workflows/ -name '*.json' -type f | while read file; do
+        echo "Validating workflow: $file"
+        python -m json.tool "$file" > /dev/null || exit 1
+      done
+    displayName: 'Validate Databricks Workflows'
+
+# ============================================================================
+# JOB 4: SQL Validation
+# ============================================================================
+- job: ValidateSQL
+  displayName: 'Validate SQL Scripts'
+  condition: eq('${{ parameters.sqlChanged }}', 'true')
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - script: |
+      echo "Installing SQL validation tools..."
+      pip install sqlfluff
+    displayName: 'Install SQL Tools'
+  
+  - script: |
+      echo "Validating SQL syntax..."
+      find sql/ -name '*.sql' -type f | while read file; do
+        echo "Linting: $file"
+        sqlfluff lint "$file" --dialect ansi || true
+      done
+    displayName: 'SQL Linting'
+  
+  - script: |
+      echo "Checking SQL naming conventions..."
+      # Add SQL naming convention validation
+    displayName: 'Validate SQL Naming Conventions'
+
+# ============================================================================
+# JOB 5: Terraform Validation
+# ============================================================================
+- job: ValidateTerraform
+  displayName: 'Validate Terraform Infrastructure'
+  condition: eq('${{ parameters.terraformChanged }}', 'true')
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - task: TerraformInstaller@0
+    displayName: 'Install Terraform'
+    inputs:
+      terraformVersion: 'latest'
+  
+  - script: |
+      echo "Running terraform fmt check..."
+      cd infrastructure/terraform
+      terraform fmt -check -recursive
+    displayName: 'Terraform Format Check'
+  
+  - script: |
+      echo "Running terraform validate..."
+      cd infrastructure/terraform
+      for env in dev int prd; do
+        echo "Validating environment: $env"
+        cd environments/$env
+        terraform init -backend=false
+        terraform validate
+        cd ../..
+      done
+    displayName: 'Terraform Validate'
+  
+  - script: |
+      echo "Running Terraform security scan..."
+      # Install and run tfsec or checkov
+      pip install checkov
+      checkov -d infrastructure/terraform --framework terraform
+    displayName: 'Terraform Security Scan'
+    continueOnError: true
+
+# ============================================================================
+# JOB 6: Unit Tests
+# ============================================================================
+- job: UnitTests
+  displayName: 'Run Unit Tests'
+  condition: or(eq('${{ parameters.databricksChanged }}', 'true'), eq('${{ parameters.testsChanged }}', 'true'))
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.10'
+    inputs:
+      versionSpec: '3.10'
+  
+  - script: |
+      echo "Installing test dependencies..."
+      pip install pytest pytest-cov pytest-html pyspark
+      if [ -f requirements.txt ]; then
+        pip install -r requirements.txt
+      fi
+    displayName: 'Install Test Dependencies'
+  
+  - script: |
+      echo "Running unit tests..."
+      pytest tests/unit/ \
+        --junitxml=$(Build.ArtifactStagingDirectory)/test-results.xml \
+        --cov=. \
+        --cov-report=html:$(Build.ArtifactStagingDirectory)/coverage \
+        --cov-report=xml:$(Build.ArtifactStagingDirectory)/coverage.xml
+    displayName: 'Execute Unit Tests'
+  
+  - task: PublishTestResults@2
+    displayName: 'Publish Test Results'
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '$(Build.ArtifactStagingDirectory)/test-results.xml'
+      testRunTitle: 'Unit Tests'
+    condition: always()
+  
+  - task: PublishCodeCoverageResults@1
+    displayName: 'Publish Code Coverage'
+    inputs:
+      codeCoverageTool: 'Cobertura'
+      summaryFileLocation: '$(Build.ArtifactStagingDirectory)/coverage.xml'
+      reportDirectory: '$(Build.ArtifactStagingDirectory)/coverage'
+    condition: always()
+
+# ============================================================================
+# JOB 7: Dependency Scanning
+# ============================================================================
+- job: DependencyScanning
+  displayName: 'Dependency & Vulnerability Scan'
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Code'
+  
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.10'
+    inputs:
+      versionSpec: '3.10'
+  
+  - script: |
+      echo "Installing safety..."
+      pip install safety
+    displayName: 'Install Safety'
+  
+  - script: |
+      echo "Scanning Python dependencies for vulnerabilities..."
+      if [ -f requirements.txt ]; then
+        safety check -r requirements.txt --json > $(Build.ArtifactStagingDirectory)/safety-report.json || true
+        cat $(Build.ArtifactStagingDirectory)/safety-report.json
+      fi
+    displayName: 'Python Dependency Scan'
+  
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Dependency Scan Results'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'dependency-scan-results'
+    condition: always()

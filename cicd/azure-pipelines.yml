@@ -1,0 +1,255 @@
+# ============================================================================
+# Azure DevOps CI/CD Pipeline - Enterprise Grade Data Engineering Solution
+# ============================================================================
+# 
+# Pipeline Flow: Feature → Dev → INT → PRD
+# Principle: Build Once, Deploy Many
+# Strategy: Change-File-Based Deployment
+#
+# ============================================================================
+
+trigger:
+  branches:
+    include:
+      - dev
+      - int
+      - release/*
+  paths:
+    exclude:
+      - README.md
+      - docs/**
+      - .gitignore
+
+pr:
+  branches:
+    include:
+      - dev
+      - int
+      - release/*
+  paths:
+    exclude:
+      - README.md
+      - docs/**
+
+variables:
+  - name: buildConfiguration
+    value: 'Release'
+  - name: artifactName
+    value: 'data-engineering-solution'
+  - name: buildVersion
+    value: '$(Build.BuildNumber)'
+  - name: System.Debug
+    value: false
+
+# Variable groups for environment-specific configuration
+# These must be created in Azure DevOps Library
+# - vg-dev-config (DEV environment variables)
+# - vg-int-config (INT environment variables)
+# - vg-prd-config (PRD environment variables)
+# - vg-shared-config (Shared configuration)
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+
+# ============================================================================
+# STAGE 1: CHANGE DETECTION
+# ============================================================================
+# Identifies which components have changed to optimize build/deploy
+# ============================================================================
+
+- stage: ChangeDetection
+  displayName: 'Detect Changed Components'
+  jobs:
+  - template: templates/jobs/change-detection.yml
+
+# ============================================================================
+# STAGE 2: CI VALIDATION
+# ============================================================================
+# Comprehensive validation of all changed components
+# Fails fast to prevent invalid code from progressing
+# ============================================================================
+
+- stage: CI_Validation
+  displayName: 'CI Validation & Build'
+  dependsOn: ChangeDetection
+  variables:
+    ADF_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.ADF_CHANGED'] ]
+    DATABRICKS_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.DATABRICKS_CHANGED'] ]
+    SQL_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.SQL_CHANGED'] ]
+    TERRAFORM_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.TERRAFORM_CHANGED'] ]
+    TESTS_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.TESTS_CHANGED'] ]
+  jobs:
+  - template: templates/stages/ci-validation.yml
+    parameters:
+      adfChanged: $(ADF_CHANGED)
+      databricksChanged: $(DATABRICKS_CHANGED)
+      sqlChanged: $(SQL_CHANGED)
+      terraformChanged: $(TERRAFORM_CHANGED)
+      testsChanged: $(TESTS_CHANGED)
+
+# ============================================================================
+# STAGE 3: BUILD ARTIFACTS
+# ============================================================================
+# Creates immutable deployment artifacts
+# Same artifact will be promoted through all environments
+# ============================================================================
+
+- stage: Build
+  displayName: 'Build Immutable Artifacts'
+  dependsOn: 
+    - ChangeDetection
+    - CI_Validation
+  condition: succeeded()
+  variables:
+    ADF_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.ADF_CHANGED'] ]
+    DATABRICKS_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.DATABRICKS_CHANGED'] ]
+    SQL_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.SQL_CHANGED'] ]
+    TERRAFORM_CHANGED: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.TERRAFORM_CHANGED'] ]
+  jobs:
+  - template: templates/stages/build-artifacts.yml
+    parameters:
+      artifactName: $(artifactName)
+      buildVersion: $(buildVersion)
+      adfChanged: $(ADF_CHANGED)
+      databricksChanged: $(DATABRICKS_CHANGED)
+      sqlChanged: $(SQL_CHANGED)
+      terraformChanged: $(TERRAFORM_CHANGED)
+
+# ============================================================================
+# STAGE 4: DEV DEPLOYMENT
+# ============================================================================
+# Automated deployment to DEV environment
+# Includes smoke tests and validation
+# ============================================================================
+
+- stage: Deploy_DEV
+  displayName: 'Deploy to DEV'
+  dependsOn: 
+    - Build
+    - ChangeDetection
+  condition: |
+    and(
+      succeeded(),
+      or(
+        eq(variables['Build.SourceBranch'], 'refs/heads/dev'),
+        startsWith(variables['Build.SourceBranch'], 'refs/heads/feature/')
+      )
+    )
+  variables:
+    - group: vg-dev-config
+    - group: vg-shared-config
+    - name: environment
+      value: 'dev'
+    - name: ADF_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.ADF_CHANGED'] ]
+    - name: DATABRICKS_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.DATABRICKS_CHANGED'] ]
+    - name: SQL_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.SQL_CHANGED'] ]
+    - name: TERRAFORM_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.TERRAFORM_CHANGED'] ]
+  jobs:
+  - template: templates/stages/deploy-dev.yml
+    parameters:
+      environment: 'DEV'
+      artifactName: $(artifactName)
+      serviceConnection: $(devServiceConnection)
+      resourceGroup: $(devResourceGroup)
+      adfChanged: $(ADF_CHANGED)
+      databricksChanged: $(DATABRICKS_CHANGED)
+      sqlChanged: $(SQL_CHANGED)
+      terraformChanged: $(TERRAFORM_CHANGED)
+
+# ============================================================================
+# STAGE 5: INT DEPLOYMENT
+# ============================================================================
+# Automated deployment to INT after DEV success
+# Includes integration tests and data validation
+# ============================================================================
+
+- stage: Deploy_INT
+  displayName: 'Deploy to INT'
+  dependsOn: 
+    - Deploy_DEV
+    - ChangeDetection
+  condition: |
+    and(
+      succeeded(),
+      or(
+        eq(variables['Build.SourceBranch'], 'refs/heads/int'),
+        eq(variables['Build.SourceBranch'], 'refs/heads/dev')
+      )
+    )
+  variables:
+    - group: vg-int-config
+    - group: vg-shared-config
+    - name: environment
+      value: 'int'
+    - name: ADF_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.ADF_CHANGED'] ]
+    - name: DATABRICKS_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.DATABRICKS_CHANGED'] ]
+    - name: SQL_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.SQL_CHANGED'] ]
+    - name: TERRAFORM_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.TERRAFORM_CHANGED'] ]
+  jobs:
+  - template: templates/stages/deploy-int.yml
+    parameters:
+      environment: 'INT'
+      artifactName: $(artifactName)
+      serviceConnection: $(intServiceConnection)
+      resourceGroup: $(intResourceGroup)
+      adfChanged: $(ADF_CHANGED)
+      databricksChanged: $(DATABRICKS_CHANGED)
+      sqlChanged: $(SQL_CHANGED)
+      terraformChanged: $(TERRAFORM_CHANGED)
+
+# ============================================================================
+# STAGE 6: PRD DEPLOYMENT
+# ============================================================================
+# Production deployment with manual approval gates
+# Includes pre/post deployment validation
+# Full audit trail maintained
+# ============================================================================
+
+- stage: Deploy_PRD
+  displayName: 'Deploy to PRODUCTION'
+  dependsOn: 
+    - Deploy_INT
+    - ChangeDetection
+  condition: |
+    and(
+      succeeded(),
+      or(
+        eq(variables['Build.SourceBranch'], 'refs/heads/release/prd'),
+        startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')
+      )
+    )
+  variables:
+    - group: vg-prd-config
+    - group: vg-shared-config
+    - name: environment
+      value: 'prd'
+    - name: ADF_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.ADF_CHANGED'] ]
+    - name: DATABRICKS_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.DATABRICKS_CHANGED'] ]
+    - name: SQL_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.SQL_CHANGED'] ]
+    - name: TERRAFORM_CHANGED
+      value: $[ stageDependencies.ChangeDetection.DetectChanges.outputs['detectChanges.TERRAFORM_CHANGED'] ]
+  jobs:
+  - template: templates/stages/deploy-prd.yml
+    parameters:
+      environment: 'PRD'
+      artifactName: $(artifactName)
+      serviceConnection: $(prdServiceConnection)
+      resourceGroup: $(prdResourceGroup)
+      adfChanged: $(ADF_CHANGED)
+      databricksChanged: $(DATABRICKS_CHANGED)
+      sqlChanged: $(SQL_CHANGED)
+      terraformChanged: $(TERRAFORM_CHANGED)
+      requireApproval: true

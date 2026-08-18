@@ -1,0 +1,240 @@
+# ============================================================================
+# Build Artifacts Stage Template
+# ============================================================================
+# Creates immutable deployment artifacts
+# Implements "Build Once, Deploy Many" principle
+# ============================================================================
+
+parameters:
+- name: artifactName
+  type: string
+  default: 'data-engineering-solution'
+- name: buildVersion
+  type: string
+- name: adfChanged
+  type: string
+  default: 'false'
+- name: databricksChanged
+  type: string
+  default: 'false'
+- name: sqlChanged
+  type: string
+  default: 'false'
+- name: terraformChanged
+  type: string
+  default: 'false'
+
+jobs:
+- job: BuildArtifacts
+  displayName: 'Build Immutable Artifacts'
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    displayName: 'Checkout Source Code'
+  
+  - task: UsePythonVersion@0
+    displayName: 'Use Python 3.10'
+    inputs:
+      versionSpec: '3.10'
+  
+  # ========================================================================
+  # Create Build Manifest
+  # ========================================================================
+  - script: |
+      echo "Creating build manifest..."
+      cat > $(Build.ArtifactStagingDirectory)/build-manifest.json <<EOF
+      {
+        "buildId": "$(Build.BuildId)",
+        "buildNumber": "$(Build.BuildNumber)",
+        "buildVersion": "${{ parameters.buildVersion }}",
+        "sourceBranch": "$(Build.SourceBranch)",
+        "sourceVersion": "$(Build.SourceVersion)",
+        "buildTimestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+        "commitSha": "$(Build.SourceVersion)",
+        "commitMessage": "$(Build.SourceVersionMessage)",
+        "requestedFor": "$(Build.RequestedFor)",
+        "components": {
+          "adf": ${{ parameters.adfChanged }},
+          "databricks": ${{ parameters.databricksChanged }},
+          "sql": ${{ parameters.sqlChanged }},
+          "terraform": ${{ parameters.terraformChanged }}
+        }
+      }
+      EOF
+      cat $(Build.ArtifactStagingDirectory)/build-manifest.json
+    displayName: 'Create Build Manifest'
+  
+  # ========================================================================
+  # Package ADF Artifacts
+  # ========================================================================
+  - script: |
+      echo "Packaging ADF artifacts..."
+      mkdir -p $(Build.ArtifactStagingDirectory)/adf
+      if [ -d "adf" ]; then
+        cp -r adf/* $(Build.ArtifactStagingDirectory)/adf/
+        echo "ADF artifacts packaged successfully"
+      else
+        echo "No ADF directory found"
+      fi
+    displayName: 'Package ADF Artifacts'
+    condition: eq('${{ parameters.adfChanged }}', 'true')
+  
+  # ========================================================================
+  # Package Databricks Artifacts
+  # ========================================================================
+  - script: |
+      echo "Packaging Databricks artifacts..."
+      mkdir -p $(Build.ArtifactStagingDirectory)/databricks
+      if [ -d "databricks" ]; then
+        # Copy notebooks
+        if [ -d "databricks/notebooks" ]; then
+          mkdir -p $(Build.ArtifactStagingDirectory)/databricks/notebooks
+          cp -r databricks/notebooks/* $(Build.ArtifactStagingDirectory)/databricks/notebooks/
+        fi
+        
+        # Copy workflows
+        if [ -d "databricks/workflows" ]; then
+          mkdir -p $(Build.ArtifactStagingDirectory)/databricks/workflows
+          cp -r databricks/workflows/* $(Build.ArtifactStagingDirectory)/databricks/workflows/
+        fi
+        
+        # Copy resources
+        if [ -d "databricks/resources" ]; then
+          mkdir -p $(Build.ArtifactStagingDirectory)/databricks/resources
+          cp -r databricks/resources/* $(Build.ArtifactStagingDirectory)/databricks/resources/
+        fi
+        
+        # Package Python source as wheel
+        if [ -d "databricks/src" ] && [ -f "databricks/setup.py" ]; then
+          cd databricks
+          python setup.py bdist_wheel
+          cp dist/*.whl $(Build.ArtifactStagingDirectory)/databricks/
+          cd ..
+        fi
+        
+        echo "Databricks artifacts packaged successfully"
+      else
+        echo "No Databricks directory found"
+      fi
+    displayName: 'Package Databricks Artifacts'
+    condition: eq('${{ parameters.databricksChanged }}', 'true')
+  
+  # ========================================================================
+  # Package SQL Artifacts
+  # ========================================================================
+  - script: |
+      echo "Packaging SQL artifacts..."
+      mkdir -p $(Build.ArtifactStagingDirectory)/sql
+      if [ -d "sql" ]; then
+        cp -r sql/* $(Build.ArtifactStagingDirectory)/sql/
+        echo "SQL artifacts packaged successfully"
+      else
+        echo "No SQL directory found"
+      fi
+    displayName: 'Package SQL Artifacts'
+    condition: eq('${{ parameters.sqlChanged }}', 'true')
+  
+  # ========================================================================
+  # Package Terraform Artifacts
+  # ========================================================================
+  - script: |
+      echo "Packaging Terraform artifacts..."
+      mkdir -p $(Build.ArtifactStagingDirectory)/terraform
+      if [ -d "infrastructure/terraform" ]; then
+        cp -r infrastructure/terraform/* $(Build.ArtifactStagingDirectory)/terraform/
+        echo "Terraform artifacts packaged successfully"
+      else
+        echo "No Terraform directory found"
+      fi
+    displayName: 'Package Terraform Artifacts'
+    condition: eq('${{ parameters.terraformChanged }}', 'true')
+  
+  # ========================================================================
+  # Package Configuration
+  # ========================================================================
+  - script: |
+      echo "Packaging configuration files..."
+      mkdir -p $(Build.ArtifactStagingDirectory)/config
+      if [ -d "config" ]; then
+        cp -r config/* $(Build.ArtifactStagingDirectory)/config/
+        echo "Configuration packaged successfully"
+      fi
+    displayName: 'Package Configuration'
+  
+  # ========================================================================
+  # Package Scripts
+  # ========================================================================
+  - script: |
+      echo "Packaging deployment scripts..."
+      mkdir -p $(Build.ArtifactStagingDirectory)/scripts
+      if [ -d "scripts" ]; then
+        cp -r scripts/* $(Build.ArtifactStagingDirectory)/scripts/
+        chmod +x $(Build.ArtifactStagingDirectory)/scripts/*.sh 2>/dev/null || true
+        chmod +x $(Build.ArtifactStagingDirectory)/scripts/*.ps1 2>/dev/null || true
+        echo "Scripts packaged successfully"
+      fi
+    displayName: 'Package Deployment Scripts'
+  
+  # ========================================================================
+  # Calculate Artifact Checksum
+  # ========================================================================
+  - script: |
+      echo "Calculating artifact checksums..."
+      cd $(Build.ArtifactStagingDirectory)
+      find . -type f -exec sha256sum {} \; > checksums.txt
+      echo "Checksums calculated and saved to checksums.txt"
+      cat checksums.txt
+    displayName: 'Calculate Checksums'
+  
+  # ========================================================================
+  # Create Version File
+  # ========================================================================
+  - script: |
+      echo "Creating version file..."
+      cat > $(Build.ArtifactStagingDirectory)/version.txt <<EOF
+      BUILD_VERSION=${{ parameters.buildVersion }}
+      BUILD_ID=$(Build.BuildId)
+      BUILD_NUMBER=$(Build.BuildNumber)
+      COMMIT_SHA=$(Build.SourceVersion)
+      BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      SOURCE_BRANCH=$(Build.SourceBranch)
+      EOF
+      cat $(Build.ArtifactStagingDirectory)/version.txt
+    displayName: 'Create Version File'
+  
+  # ========================================================================
+  # Publish Pipeline Artifact
+  # ========================================================================
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Build Artifacts'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: '${{ parameters.artifactName }}'
+      publishLocation: 'pipeline'
+  
+  # ========================================================================
+  # Display Artifact Summary
+  # ========================================================================
+  - script: |
+      echo ""
+      echo "============================================"
+      echo "Build Artifacts Summary"
+      echo "============================================"
+      echo "Artifact Name: ${{ parameters.artifactName }}"
+      echo "Build Version: ${{ parameters.buildVersion }}"
+      echo "Build ID:      $(Build.BuildId)"
+      echo "Commit SHA:    $(Build.SourceVersion)"
+      echo ""
+      echo "Components Packaged:"
+      echo "  ADF:        ${{ parameters.adfChanged }}"
+      echo "  Databricks: ${{ parameters.databricksChanged }}"
+      echo "  SQL:        ${{ parameters.sqlChanged }}"
+      echo "  Terraform:  ${{ parameters.terraformChanged }}"
+      echo "============================================"
+      echo ""
+      echo "Artifact Contents:"
+      ls -lah $(Build.ArtifactStagingDirectory)
+      echo "============================================"
+    displayName: 'Display Artifact Summary'

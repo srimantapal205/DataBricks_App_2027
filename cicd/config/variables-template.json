@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "title": "Azure DevOps Variable Groups Configuration",
+  "description": "Centralized configuration template for CI/CD pipeline variable groups",
+  "version": "1.0.0",
+  "lastUpdated": "2024-01-XX",
+  
+  "variableGroups": {
+    
+    "vg-shared-config": {
+      "description": "Common configuration shared across all environments",
+      "variables": {
+        "AZURE_SUBSCRIPTION_ID": {
+          "value": "YOUR_SUBSCRIPTION_ID",
+          "description": "Azure subscription ID",
+          "secret": false,
+          "required": true
+        },
+        "AZURE_LOCATION": {
+          "value": "eastus",
+          "description": "Primary Azure region for deployments",
+          "secret": false,
+          "required": true
+        },
+        "AZURE_TENANT_ID": {
+          "value": "YOUR_TENANT_ID",
+          "description": "Azure AD tenant ID",
+          "secret": false,
+          "required": true
+        },
+        "TF_STATE_STORAGE_ACCOUNT": {
+          "value": "tfstatestorage",
+          "description": "Storage account for Terraform state files",
+          "secret": false,
+          "required": true
+        },
+        "TF_STATE_CONTAINER": {
+          "value": "tfstate",
+          "description": "Container name for Terraform state files",
+          "secret": false,
+          "required": true
+        },
+        "DATABRICKS_WORKSPACE_PATH": {
+          "value": "/Shared/DataEngineering",
+          "description": "Base path for Databricks deployments",
+          "secret": false,
+          "required": true
+        },
+        "DATABRICKS_RESOURCE_ID": {
+          "value": "2ff814a6-3304-4ab8-85cb-cd0e6f879c1d",
+          "description": "Azure Databricks resource ID (constant)",
+          "secret": false,
+          "required": true
+        },
+        "PROJECT_NAME": {
+          "value": "dataeng",
+          "description": "Project identifier for naming conventions",
+          "secret": false,
+          "required": true
+        },
+        "COMPANY_PREFIX": {
+          "value": "contoso",
+          "description": "Company/organization prefix for resource naming",
+          "secret": false,
+          "required": true
+        },
+        "TAG_COST_CENTER": {
+          "value": "Engineering",
+          "description": "Cost center tag for resource billing",
+          "secret": false,
+          "required": false
+        },
+        "TAG_MANAGED_BY": {
+          "value": "Terraform",
+          "description": "Management method tag",
+          "secret": false,
+          "required": false
+        },
+        "TAG_PROJECT": {
+          "value": "DataEngineering",
+          "description": "Project name tag",
+          "secret": false,
+          "required": false
+        }
+      }
+    },
+    
+    "vg-dev-config": {
+      "description": "DEV environment-specific configuration",
+      "variables": {
+        "ENVIRONMENT": {
+          "value": "dev",
+          "description": "Environment name",
+          "secret": false,
+          "required": true
+        },
+        "ENV_SHORT": {
+          "value": "dev",
+          "description": "Environment abbreviation",
+          "secret": false,
+          "required": true
+        },
+        "devServiceConnection": {
+          "value": "azure-dev-service-connection",
+          "description": "Azure DevOps service connection name for DEV",
+          "secret": false,
+          "required": true
+        },
+        "devResourceGroup": {
+          "value": "rg-dataeng-dev",
+          "description": "Primary resource group for DEV environment",
+          "secret": false,
+          "required": true
+        },
+        "DEV_ADF_NAME": {
+          "value": "adf-dataeng-dev",
+          "description": "Azure Data Factory name",
+          "secret": false,
+          "required": true
+        },
+        "DEV_ADF_RESOURCE_GROUP": {
+          "value": "rg-dataeng-dev",
+          "description": "ADF resource group",
+          "secret": false,
+          "required": true
+        },
+        "DEV_DATABRICKS_HOST": {
+          "value": "https://adb-xxxxx.azuredatabricks.net",
+          "description": "Databricks workspace URL",
+          "secret": false,
+          "required": true
+        },
+        "DEV_DATABRICKS_WORKSPACE_NAME": {
+          "value": "dbw-dataeng-dev",
+          "description": "Databricks workspace name",
+          "secret": false,
+          "required": true
+        },
+        "DEV_DATABRICKS_WORKSPACE_ID": {
+          "value": "/subscriptions/xxx/resourceGroups/rg-dataeng-dev/providers/Microsoft.Databricks/workspaces/dbw-dataeng-dev",
+          "description": "Full Databricks workspace resource ID",
+          "secret": false,
+          "required": true
+        },
+        "DEV_SQL_SERVER": {
+          "value": "sql-dataeng-dev.database.windows.net",
+          "description": "SQL Server FQDN",
+          "secret": false,
+          "required": true
+        },
+        "DEV_SQL_DATABASE": {
+          "value": "sqldb-dataeng-dev",
+          "description": "SQL Database name",
+          "secret": false,
+          "required": true
+        },
+        "DEV_STORAGE_ACCOUNT": {
+          "value": "stdataengdev",
+          "description": "Storage account name",
+          "secret": false,
+          "required": true
+        },
+        "DEV_DATA_LAKE_NAME": {
+          "value": "datalake-dev",
+          "description": "Data lake container name",
+          "secret": false,
+          "required": true
+        },
+        "DEV_KEY_VAULT_NAME": {
+          "value": "kv-dataeng-dev",
+          "description": "Key Vault name",
+          "secret": false,
+          "required": true
+        },
+        "TAG_ENVIRONMENT": {
+          "value": "Development",
+          "description": "Environment tag value",
+          "secret": false,
+          "required": false
+        }
+      }
+    },
+    
+    "vg-int-config": {
+      "description": "INT environment-specific configuration",
+      "variables": {
+        "ENVIRONMENT": {
+          "value": "int",
+          "description": "Environment name",
+          "secret": false,
+          "required": true
+        },
+        "ENV_SHORT": {
+          "value": "int",
+          "description": "Environment abbreviation",
+          "secret": false,
+          "required": true
+        },
+        "intServiceConnection": {
+          "value": "azure-int-service-connection",
+          "description": "Azure DevOps service connection name for INT",
+          "secret": false,
+          "required": true
+        },
+        "intResourceGroup": {
+          "value": "rg-dataeng-int",
+          "description": "Primary resource group for INT environment",
+          "secret": false,
+          "required": true
+        },
+        "INT_ADF_NAME": {
+          "value": "adf-dataeng-int",
+          "description": "Azure Data Factory name",
+          "secret": false,
+          "required": true
+        },
+        "INT_ADF_RESOURCE_GROUP": {
+          "value": "rg-dataeng-int",
+          "description": "ADF resource group",
+          "secret": false,
+          "required": true
+        },
+        "INT_DATABRICKS_HOST": {
+          "value": "https://adb-xxxxx.azuredatabricks.net",
+          "description": "Databricks workspace URL",
+          "secret": false,
+          "required": true
+        },
+        "INT_DATABRICKS_WORKSPACE_NAME": {
+          "value": "dbw-dataeng-int",
+          "description": "Databricks workspace name",
+          "secret": false,
+          "required": true
+        },
+        "INT_DATABRICKS_WORKSPACE_ID": {
+          "value": "/subscriptions/xxx/resourceGroups/rg-dataeng-int/providers/Microsoft.Databricks/workspaces/dbw-dataeng-int",
+          "description": "Full Databricks workspace resource ID",
+          "secret": false,
+          "required": true
+        },
+        "INT_SQL_SERVER": {
+          "value": "sql-dataeng-int.database.windows.net",
+          "description": "SQL Server FQDN",
+          "secret": false,
+          "required": true
+        },
+        "INT_SQL_DATABASE": {
+          "value": "sqldb-dataeng-int",
+          "description": "SQL Database name",
+          "secret": false,
+          "required": true
+        },
+        "INT_STORAGE_ACCOUNT": {
+          "value": "stdataengint",
+          "description": "Storage account name",
+          "secret": false,
+          "required": true
+        },
+        "INT_DATA_LAKE_NAME": {
+          "value": "datalake-int",
+          "description": "Data lake container name",
+          "secret": false,
+          "required": true
+        },
+        "INT_KEY_VAULT_NAME": {
+          "value": "kv-dataeng-int",
+          "description": "Key Vault name",
+          "secret": false,
+          "required": true
+        },
+        "TAG_ENVIRONMENT": {
+          "value": "Integration",
+          "description": "Environment tag value",
+          "secret": false,
+          "required": false
+        }
+      }
+    },
+    
+    "vg-prd-config": {
+      "description": "PRD (Production) environment-specific configuration",
+      "variables": {
+        "ENVIRONMENT": {
+          "value": "prd",
+          "description": "Environment name",
+          "secret": false,
+          "required": true
+        },
+        "ENV_SHORT": {
+          "value": "prd",
+          "description": "Environment abbreviation",
+          "secret": false,
+          "required": true
+        },
+        "prdServiceConnection": {
+          "value": "azure-prd-service-connection",
+          "description": "Azure DevOps service connection name for PRD",
+          "secret": false,
+          "required": true
+        },
+        "prdResourceGroup": {
+          "value": "rg-dataeng-prd",
+          "description": "Primary resource group for PRD environment",
+          "secret": false,
+          "required": true
+        },
+        "PRD_ADF_NAME": {
+          "value": "adf-dataeng-prd",
+          "description": "Azure Data Factory name",
+          "secret": false,
+          "required": true
+        },
+        "PRD_ADF_RESOURCE_GROUP": {
+          "value": "rg-dataeng-prd",
+          "description": "ADF resource group",
+          "secret": false,
+          "required": true
+        },
+        "PRD_DATABRICKS_HOST": {
+          "value": "https://adb-xxxxx.azuredatabricks.net",
+          "description": "Databricks workspace URL",
+          "secret": false,
+          "required": true
+        },
+        "PRD_DATABRICKS_WORKSPACE_NAME": {
+          "value": "dbw-dataeng-prd",
+          "description": "Databricks workspace name",
+          "secret": false,
+          "required": true
+        },
+        "PRD_DATABRICKS_WORKSPACE_ID": {
+          "value": "/subscriptions/xxx/resourceGroups/rg-dataeng-prd/providers/Microsoft.Databricks/workspaces/dbw-dataeng-prd",
+          "description": "Full Databricks workspace resource ID",
+          "secret": false,
+          "required": true
+        },
+        "PRD_SQL_SERVER": {
+          "value": "sql-dataeng-prd.database.windows.net",
+          "description": "SQL Server FQDN",
+          "secret": false,
+          "required": true
+        },
+        "PRD_SQL_DATABASE": {
+          "value": "sqldb-dataeng-prd",
+          "description": "SQL Database name",
+          "secret": false,
+          "required": true
+        },
+        "PRD_STORAGE_ACCOUNT": {
+          "value": "stdataengprd",
+          "description": "Storage account name",
+          "secret": false,
+          "required": true
+        },
+        "PRD_DATA_LAKE_NAME": {
+          "value": "datalake-prd",
+          "description": "Data lake container name",
+          "secret": false,
+          "required": true
+        },
+        "PRD_KEY_VAULT_NAME": {
+          "value": "kv-dataeng-prd",
+          "description": "Key Vault name",
+          "secret": false,
+          "required": true
+        },
+        "TAG_ENVIRONMENT": {
+          "value": "Production",
+          "description": "Environment tag value",
+          "secret": false,
+          "required": false
+        }
+      }
+    }
+  },
+  
+  "metadata": {
+    "usage": "This JSON file serves as a reference template for all variable groups. Use variable-groups-setup.ps1 to create/update actual variable groups in Azure DevOps.",
+    "maintainer": "DevOps Team",
+    "repository": "DataBricks_App_2027"
+  }
+}

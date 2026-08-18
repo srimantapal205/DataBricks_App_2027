@@ -1,0 +1,36 @@
+# ============================================================================
+# Change Detection Job Template
+# ============================================================================
+# Executes the change detection script and sets output variables
+# ============================================================================
+
+jobs:
+- job: DetectChanges
+  displayName: 'Detect Changed Components'
+  pool:
+    vmImage: 'ubuntu-latest'
+  
+  steps:
+  - checkout: self
+    fetchDepth: 0
+    displayName: 'Checkout Repository (Full History)'
+  
+  - task: PowerShell@2
+    name: detectChanges
+    displayName: 'Run Change Detection Script'
+    inputs:
+      targetType: 'filePath'
+      filePath: '$(Build.SourcesDirectory)/scripts/detect-changes.ps1'
+      arguments: '-SourceBranch "$(Build.SourceBranch)" -TargetBranch "$(System.PullRequest.TargetBranch)"'
+      pwsh: true
+      failOnStderr: false
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+  
+  - task: PublishPipelineArtifact@1
+    displayName: 'Publish Change Detection Results'
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'change-detection-results'
+      publishLocation: 'pipeline'
+    condition: always()
